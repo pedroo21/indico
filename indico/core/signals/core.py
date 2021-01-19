@@ -94,3 +94,7 @@ sent in the *password* kwarg. To fail the security check for a password,
 the signal handler should return a string describing why the password is
 not secure.
 """)
+
+get_search_providers = _signals.signal('get-search-providers', """
+Expected to return...
+""")
