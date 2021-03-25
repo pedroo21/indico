@@ -4,6 +4,7 @@
 # Indico is free software; you can redistribute it and/or
 # modify it under the terms of the MIT License; see the
 # LICENSE file for more details.
+
 from marshmallow import post_dump
 
 from indico.core.db.sqlalchemy.links import LinkType
@@ -12,6 +13,9 @@ from indico.modules.attachments import Attachment
 from indico.modules.categories import Category
 from indico.modules.events import Event
 from indico.modules.events.contributions import Contribution
+from indico.modules.events.contributions.models.subcontributions import SubContribution
+from indico.modules.events.notes.models.notes import EventNote
+from indico.modules.search.base import SearchTarget
 from indico.web.flask.util import url_for
 
 
@@ -36,7 +40,6 @@ class DetailedCategorySchema(mm.SQLAlchemyAutoSchema):
 
 
 class PersonSchema(mm.Schema):
-    id = mm.Int()
     name = mm.Function(lambda e: e.title and f'{e.title} {e.name}' or e.name)
     affiliation = mm.String()
 
@@ -47,28 +50,36 @@ class LocationSchema(mm.Schema):
     address = mm.String()
 
 
-# TODO: Date formats
 class EventSchema(mm.SQLAlchemyAutoSchema):
     class Meta:
         model = Event
-        fields = ('id', 'title', 'description', 'url', 'type', 'keywords', 'category_path', 'chair_persons',
-                  'location', 'start_dt', 'end_dt')
+        fields = ('event_id', 'type', 'type_format', 'title', 'description', 'url', 'keywords', 'location', 'persons',
+                  'category_path', 'start_dt', 'end_dt')
 
+    event_id = mm.Int(attribute='id')
+    type = mm.Function(lambda a: SearchTarget.event.name)
+    type_format = mm.String(attribute='type')
     location = mm.Function(lambda event: LocationSchema().dump(event))
-    chair_persons = mm.List(mm.Nested(PersonSchema), attribute='person_links')
+    persons = mm.List(mm.Nested(PersonSchema), attribute='person_links')
     category_path = mm.List(mm.Nested(CategorySchema), attribute='detailed_category_chain')
+    note = mm.String()
 
 
 class AttachmentSchema(mm.SQLAlchemyAutoSchema):
     class Meta:
         model = Attachment
-        fields = ('type', 'title', 'url', 'filename', 'event_id', 'contribution_id', 'user', 'content', 'modified_dt')
+        fields = ('attachment_id', 'type', 'type_format', 'title', 'filename', 'event_id', 'contribution_id',
+                  'subcontribution_id', 'user', 'url', 'category_path', 'content', 'modified_dt')
 
+    attachment_id = mm.Int(attribute='id')
+    type = mm.Function(lambda a: SearchTarget.attachment.name)
+    type_format = mm.String(attribute='type.name')
     filename = mm.String(attribute='file.filename')
     event_id = mm.Int(attribute='folder.event.id')
     contribution_id = mm.Method('_contribution_id')
     subcontribution_id = mm.Method('_subcontribution_id')
     user = mm.Nested(PersonSchema)
+    category_path = mm.List(mm.Nested(CategorySchema), attribute='folder.event.detailed_category_chain')
     url = mm.String(attribute='download_url')
     content = mm.String()
 
@@ -83,23 +94,45 @@ class AttachmentSchema(mm.SQLAlchemyAutoSchema):
 class ContributionSchema(mm.SQLAlchemyAutoSchema):
     class Meta:
         model = Contribution
-        fields = ('id', 'type', 'event_id', 'title', 'description', 'location', 'persons', 'url', 'start_dt', 'end_dt')
+        fields = ('contribution_id', 'type', 'type_format', 'event_id', 'title', 'description', 'location',
+                  'persons', 'url', 'category_path', 'start_dt', 'end_dt')
 
-    type = mm.String(attribute='type.name')
+    contribution_id = mm.Int(attribute='id')
+    type = mm.Function(lambda a: SearchTarget.contribution.name)
+    type_format = mm.String(attribute='type.name')
     location = mm.Function(lambda contrib: LocationSchema().dump(contrib))
     persons = mm.List(mm.Nested(PersonSchema), attribute='person_links')
+    category_path = mm.List(mm.Nested(CategorySchema), attribute='event.detailed_category_chain')
     url = mm.Function(lambda contrib: url_for('contributions.display_contribution', contrib, _external=False))
 
 
-class ResultSchema(mm.Schema):
-    page = mm.Int(required=True)
-    pages = mm.Int(required=True)
-    total = mm.Int(required=True)
+class SubContributionSchema(mm.SQLAlchemyAutoSchema):
+    class Meta:
+        model = SubContribution
+        fields = ('subcontribution_id', 'type', 'title', 'description', 'event_id', 'contribution_id', 'persons',
+                  'location', 'url', 'category_path')
+
+    subcontribution_id = mm.Int(attribute='id')
+    type = mm.Function(lambda a: SearchTarget.subcontribution.name)
+    event_id = mm.Int(attribute='contribution.event_id')
+    persons = mm.List(mm.Nested(PersonSchema), attribute='person_links')
+    location = mm.Function(lambda subc: LocationSchema().dump(subc.contribution))
+    category_path = mm.List(mm.Nested(CategorySchema), attribute='event.detailed_category_chain')
+    url = mm.Function(lambda subc: url_for('contributions.display_subcontribution', subc, _external=False))
 
 
-class CategoryResultSchema(ResultSchema):
-    results = mm.Nested(DetailedCategorySchema, required=True, many=True, attribute='items')
+class EventNoteSchema(mm.SQLAlchemyAutoSchema):
+    class Meta:
+        model = EventNote
+        fields = ('note_id', 'type', 'content', 'event_id', 'contribution_id', 'subcontribution_id', 'url',
+                  'category_path', 'created_dt')
 
-
-class EventResultSchema(ResultSchema):
-    results = mm.Nested(EventSchema, required=True, many=True, attribute='items')
+    note_id = mm.Int(attribute='id')
+    type = mm.Function(lambda a: SearchTarget.event_note.name)
+    content = mm.Str(attribute='html')
+    contribution_id = mm.Int(attribute='object.id')
+    subcontribution_id = mm.Int()
+    category_path = mm.List(mm.Nested(CategorySchema), attribute='event.detailed_category_chain')
+    url = mm.Function(lambda note: url_for('event_notes.view', note, _external=False))
+    # session_id = mm.Function(lambda note: note.session.id if note.session else None)
+    created_dt = mm.DateTime(attribute='current_revision.created_dt', format='%Y-%m-%dT%H:%M')
