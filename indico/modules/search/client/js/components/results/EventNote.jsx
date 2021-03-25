@@ -8,35 +8,36 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import {List} from 'semantic-ui-react';
-
-import CategoryPath from './CategoryPath';
 import '../ResultList.module.scss';
 
-export default function Category({title, path, url}) {
+const EventNote = ({title, url, content, highlight}) => {
   return (
     <div styleName="item">
       <List.Header styleName="header">
         <a href={url}>{title}</a>
       </List.Header>
-      {path.length !== 0 && (
-        <div styleName="description">
-          <List.Description>
-            <CategoryPath path={path} />
-          </List.Description>
-        </div>
-      )}
+      <List.Description styleName="description">
+        {highlight.content ? (
+          highlight.content
+            .slice(0, 3)
+            .map(html => <span key={html} dangerouslySetInnerHTML={{__html: html}} />)
+        ) : (
+          <span>{content.slice(0, 240)}</span>
+        )}
+      </List.Description>
     </div>
   );
-}
-
-Category.propTypes = {
-  title: PropTypes.string.isRequired,
-  path: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.number.isRequired,
-      title: PropTypes.string.isRequired,
-      url: PropTypes.string.isRequired,
-    })
-  ).isRequired,
-  url: PropTypes.string.isRequired,
 };
+
+EventNote.propTypes = {
+  title: PropTypes.string.isRequired,
+  content: PropTypes.string.isRequired,
+  url: PropTypes.string.isRequired,
+  highlight: PropTypes.array,
+};
+
+EventNote.defaultProps = {
+  highlight: [],
+};
+
+export default EventNote;

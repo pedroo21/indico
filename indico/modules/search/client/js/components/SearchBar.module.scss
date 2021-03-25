@@ -7,10 +7,11 @@
 
 @import 'base/palette';
 
-.category {
-  padding: 1em 0;
+.placeholder {
+  font-size: 0.95em;
+  color: $dark-gray;
 
-  .description {
-    padding: 0.5em 0;
+  .label {
+    margin-right: 1em !important;
   }
 }

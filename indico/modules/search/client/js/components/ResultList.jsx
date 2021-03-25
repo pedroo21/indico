@@ -44,8 +44,9 @@ export default function ResultList({
             </Placeholder>
           ) : (
             data.map(item => (
-              <List.Item key={item.id}>
-                <List.Content styleName="list">
+              <List.Item key={Math.random() + item.url}>
+                {/* TODO: remove */}
+                <List.Content>
                   <Component {...item} />
                 </List.Content>
               </List.Item>
